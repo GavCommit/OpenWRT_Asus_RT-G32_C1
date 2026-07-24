@@ -1,7 +1,6 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
-#
-# File: .github/workflows/openwrt-bulder.yml
+# File: .github/workflows/openwrt-builder.yml
 # Description: Build OpenWrt using GitHub Actions
 #
 # Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
@@ -12,7 +11,6 @@
 
 name: OpenWrt Builder
 
-
 on:
   repository_dispatch:
   workflow_dispatch:
@@ -20,14 +18,11 @@ on:
 env:
   REPO_URL: https://git.openwrt.org/openwrt/openwrt.git
   REPO_BRANCH: openwrt-19.07
-  FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: .config
-  DIY_P1_SH: diy-part1.sh
-  DIY_P2_SH: diy-part2.sh
   UPLOAD_BIN_DIR: false
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
-  TZ: Asia/Shanghai
+  TZ: UTC
 
 jobs:
   build:
@@ -58,13 +53,6 @@ jobs:
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: Load custom feeds
-      run: |
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
-        chmod +x $DIY_P1_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P1_SH
-
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
 
@@ -73,13 +61,14 @@ jobs:
 
     - name: Load custom configuration
       run: |
-        [ -e files ] && mv files openwrt/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
-        chmod +x $DIY_P2_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P2_SH
+        if [ -e $CONFIG_FILE ]; then
+          cp $CONFIG_FILE openwrt/.config
+        else
+          echo "ERROR: Config file $CONFIG_FILE not found!"
+          exit 1
+        fi
 
-    - name: Download package
+    - name: Download package sources
       id: package
       run: |
         cd openwrt
@@ -132,7 +121,6 @@ jobs:
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
-        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware to release
